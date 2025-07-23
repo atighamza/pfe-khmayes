@@ -14,6 +14,12 @@ const internshipSchema = new mongoose.Schema(
     technologies: [String],
     type: String,
     duration: String,
+    applications: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Application",
+      },
+    ],
   },
   { timestamps: true }
 );

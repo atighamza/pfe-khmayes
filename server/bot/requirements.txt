@@ -1,0 +1,13 @@
+flask
+openai
+python-dotenv
+pymongo
+flask-cors
+bcrypt
+PyJWT
+pypdf
+langchain
+chromadb
+sentence-transformers
+tiktoken
+langchain-huggingface

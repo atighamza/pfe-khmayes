@@ -3,7 +3,7 @@ import { login } from "../api/auth";
 import { useNavigate } from "react-router-dom";
 import { toastError, toastSuccess } from "../utils/toasts";
 
-export default function Login() {
+export default function Login({ onLogin }: { onLogin?: () => void }) {
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -15,7 +15,8 @@ export default function Login() {
       const res = await login(form);
       localStorage.setItem("token", res.data.token);
       toastSuccess("Welcome back, " + res.data.user.name);
-      navigate("/dashboard");
+      if (onLogin) onLogin(); // notify parent
+      navigate("/");
     } catch (err) {
       toastError("Invalid email or password");
     } finally {
@@ -47,7 +48,7 @@ export default function Login() {
                 className="peer w-full border border-gray-300 px-4 py-3 rounded-xl placeholder-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
-              <label className="absolute left-4 top-2 text-sm text-gray-500 peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 transition-all">
+              <label className="absolute left-4 top-0.5 text-sm text-gray-500 peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 transition-all">
                 Email address
               </label>
             </div>
@@ -60,7 +61,7 @@ export default function Login() {
                 className="peer w-full border border-gray-300 px-4 py-3 rounded-xl placeholder-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
-              <label className="absolute left-4 top-2 text-sm text-gray-500 peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 transition-all">
+              <label className="absolute left-4 top-0.5 text-sm text-gray-500 peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 transition-all">
                 Password
               </label>
             </div>

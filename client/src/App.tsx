@@ -13,14 +13,22 @@ import EditInternship from "./pages/EditInternship";
 import CompanyViewStudentPosts from "./pages/CompanyViewStudentPosts";
 import StudentBrowseInternships from "./pages/StudentBrowseInternships";
 import StudentProfile from "./pages/StudentProfile";
+import { useAuth } from "./hooks/useAuth";
+import AssistantBot from "./components/AssistantBot";
+import HomePage from "./pages/HomePage";
 
-function App() {
+export default function App() {
+  const [authChanged, setAuthChanged] = useState(0);
+  const { isAuthenticated } = useAuth();
   return (
     <>
       <Navbar />
       <Routes>
-        <Route path="/" element={<>Hello world</>} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<HomePage />} />
+        <Route
+          path="/login"
+          element={<Login onLogin={() => setAuthChanged((v) => v + 1)} />}
+        />
         <Route path="/signup" element={<Signup />} />
 
         <Route
@@ -74,8 +82,7 @@ function App() {
           }
         />
       </Routes>
+      {isAuthenticated && <AssistantBot />}
     </>
   );
 }
-
-export default App;

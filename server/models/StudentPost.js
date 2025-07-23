@@ -7,13 +7,20 @@ const studentPostSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    title: { type: String, required: true },
-    description: { type: String },
-    internshipType: {
-      type: String,
-      enum: ["Summer", "Final Year", "Gap Year"],
+    internshipId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Internship",
+      required: true,
     },
-    technologies: [String],
+    status: {
+      type: String,
+      enum: ["pending", "accepted", "rejected"],
+      default: "pending",
+    },
+    note: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );

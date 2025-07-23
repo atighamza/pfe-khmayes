@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { fetchAllInternships } from "../api/internship";
-import toast from "react-hot-toast";
+import { Search } from "lucide-react";
+import { toastError, toastSuccess } from "../utils/toasts";
+import InternshipDialog from "../components/InternshipDialog";
+import { checkApplicationStatus, applyForInternship } from "../api/application";
 
 export default function StudentBrowseInternships() {
   const [internships, setInternships] = useState([]);
@@ -11,6 +14,9 @@ export default function StudentBrowseInternships() {
   const [type, setType] = useState("");
   const [tech, setTech] = useState("");
 
+  const [selectedInternship, setSelectedInternship] = useState<any>(null);
+  const [hasApplied, setHasApplied] = useState(false);
+
   const limit = 6;
 
   const loadInternships = async () => {
@@ -19,7 +25,7 @@ export default function StudentBrowseInternships() {
       setInternships(res.data.internships);
       setTotal(res.data.total);
     } catch {
-      toast.error("Failed to fetch internships");
+      toastError("Failed to fetch internships");
     }
   };
 
@@ -33,13 +39,41 @@ export default function StudentBrowseInternships() {
     setSearch(searchInput);
   };
 
+  const handleInternshipClick = async (internship: any) => {
+    try {
+      const res = await checkApplicationStatus(internship._id);
+      setHasApplied(res.data.hasApplied);
+      setSelectedInternship(internship);
+    } catch (err) {
+      toastError("Failed to check application status");
+    }
+  };
+
+  const handleApply = async () => {
+    if (hasApplied) {
+      toastError("You have already applied to this internship");
+      return;
+    }
+
+    try {
+      await applyForInternship(selectedInternship._id);
+      setHasApplied(true);
+      toastSuccess("Application submitted successfully!");
+    } catch (err) {
+      toastError("Failed to submit application");
+    }
+  };
+
   const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 px-4 py-10">
-      <h2 className="text-4xl font-extrabold text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-purple-600 mb-10">
-        🔍 Explore Internship Opportunities
-      </h2>
+      <div className="flex justify-center items-center gap-4 my-8">
+        <Search size={40} color="blue" />
+        <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-purple-600">
+          Explore Internship Opportunities
+        </h2>
+      </div>
 
       <form onSubmit={handleSearch} className="max-w-4xl mx-auto mb-8">
         <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -109,11 +143,12 @@ export default function StudentBrowseInternships() {
           {internships.length === 0 ? (
             <p className="text-gray-500 text-lg">No internships found.</p>
           ) : (
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
               {internships.map((post: any) => (
                 <div
                   key={post._id}
-                  className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition"
+                  onClick={() => handleInternshipClick(post)}
+                  className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition cursor-pointer"
                 >
                   <h3 className="text-2xl font-semibold text-blue-700 mb-2">
                     {post.title}
@@ -164,6 +199,16 @@ export default function StudentBrowseInternships() {
           )}
         </div>
       </div>
+
+      {/* Add the dialog */}
+      {selectedInternship && (
+        <InternshipDialog
+          internship={selectedInternship}
+          onClose={() => setSelectedInternship(null)}
+          onApply={handleApply}
+          hasApplied={hasApplied}
+        />
+      )}
     </div>
   );
 }

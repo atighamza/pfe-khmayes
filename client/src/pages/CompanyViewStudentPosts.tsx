@@ -53,7 +53,7 @@ export default function CompanyViewStudentPosts() {
       </div>
 
       {posts.length === 0 ? (
-        <p className="text-gray-500">No student posts found.</p>
+        <p className="text-gray-500 text-lg">No student posts found.</p>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {posts.map((post: any) => (
@@ -61,17 +61,23 @@ export default function CompanyViewStudentPosts() {
               key={post._id}
               className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition"
             >
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                {post.title}
-              </h3>
-              <p className="text-gray-600 text-sm mb-3">{post.description}</p>
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="text-xl font-semibold text-gray-800">
+                  {post.internshipId?.title || "Untitled Internship"}
+                </h3>
+                <span
+                  className={`px-2 py-1 rounded text-sm ${
+                    post.status === "pending"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : post.status === "accepted"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {post.status || "pending"}
+                </span>
+              </div>
               <div className="text-sm text-gray-500">
-                <p>
-                  <strong>Type:</strong> {post.internshipType}
-                </p>
-                <p>
-                  <strong>Technologies:</strong> {post.technologies.join(", ")}
-                </p>
                 <p>
                   <strong>Student:</strong> {post.studentId?.name} (
                   <a
@@ -81,6 +87,14 @@ export default function CompanyViewStudentPosts() {
                     {post.studentId?.email}
                   </a>
                   )
+                </p>
+                {post.note && (
+                  <p className="mt-2">
+                    <strong>Note:</strong> {post.note}
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-gray-400">
+                  Applied on: {new Date(post.createdAt).toLocaleDateString()}
                 </p>
               </div>
             </div>

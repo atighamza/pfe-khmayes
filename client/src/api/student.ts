@@ -16,10 +16,13 @@ export const fetchStudentProfile = () => {
     headers: { Authorization: `Bearer ${token}` },
   });
 };
-export const updateStudentProfile = (data: any) => {
+export const updateStudentProfile = (formData: FormData) => {
   const token = localStorage.getItem("token");
 
-  return axios.put(`${API}/profile`, data, {
-    headers: { Authorization: `Bearer ${token}` },
+  return axios.put(`${API}/profile`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "multipart/form-data",
+    },
   });
 };

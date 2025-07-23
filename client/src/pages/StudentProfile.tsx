@@ -11,6 +11,7 @@ export default function StudentProfile() {
     year: "",
     resumeUrl: "",
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -27,12 +28,32 @@ export default function StudentProfile() {
   const handleChange = (e: any) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e: any) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        toastError("Please upload only PDF files");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await updateStudentProfile(formData);
-      toastSuccess("Profile updated");
-    } catch {
+      const formDataToSend = new FormData();
+      formDataToSend.append("name", formData.name);
+      formDataToSend.append("university", formData.university);
+      formDataToSend.append("degree", formData.degree);
+      formDataToSend.append("year", formData.year);
+      if (selectedFile) {
+        formDataToSend.append("resume", selectedFile);
+      }
+
+      await updateStudentProfile(formDataToSend);
+      toastSuccess("Profile updated successfully");
+    } catch (err) {
       toastError("Update failed");
     }
   };
@@ -89,14 +110,23 @@ export default function StudentProfile() {
             />
           </div>
           <div>
-            <label className="block mb-1 font-medium">Resume URL</label>
+            <label className="block mb-1 font-medium">Resume (PDF only)</label>
             <input
-              type="text"
-              name="resumeUrl"
-              className="peer w-full border border-gray-300 px-4 py-3 rounded-xl placeholder-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.resumeUrl}
-              onChange={handleChange}
+              type="file"
+              accept=".pdf"
+              onChange={handleFileChange}
+              className="w-full border border-gray-300 px-4 py-3 rounded-xl"
             />
+            {formData.resumeUrl && formData.resumeUrl.trim() !== "" && (
+              <a
+                href={`http://localhost:5000${formData.resumeUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline mt-2 inline-block"
+              >
+                View Current Resume
+              </a>
+            )}
           </div>
         </div>
 

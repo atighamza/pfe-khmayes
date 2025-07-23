@@ -5,12 +5,14 @@ const authRoutes = require("./routes/authRoutes");
 const internshipRoutes = require("./routes/internshipRoutes");
 const studentPostRoutes = require("./routes/studentPostRoutes");
 const cors = require("cors");
+const { spawn } = require("child_process");
 
 dotenv.config();
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static("uploads")); // Add this line
 
 mongoose
   .connect(process.env.MONGO_URI, {
@@ -26,6 +28,25 @@ app.use("/api/student", studentPostRoutes);
 
 app.get("/", (req, res) => {
   res.send("hello world");
+});
+
+// Update Flask app integration
+const flaskProcess = spawn("python", [
+  "-m",
+  "flask",
+  "--app",
+  "bot/app.py",
+  "run",
+  "--port",
+  "5100",
+]);
+
+flaskProcess.stdout.on("data", (data) => {
+  console.log(`Flask: ${data}`);
+});
+
+flaskProcess.stderr.on("data", (data) => {
+  console.error(`Flask Error: ${data}`);
 });
 
 const PORT = process.env.PORT || 5000;

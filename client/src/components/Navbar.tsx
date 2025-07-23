@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useEffect, useState } from "react";
+import logo from "../assets/logo.png";
 
 export default function Navbar() {
   const { isAuthenticated, role } = useAuth();
@@ -22,11 +23,13 @@ export default function Navbar() {
   return (
     <nav className="bg-white shadow-md px-6 py-4 flex justify-between items-center sticky top-0 z-50">
       {/* Logo */}
+
       <Link
         to="/"
         className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
       >
-        Forsa
+        <img src={logo} alt="forsa" width={150} height={150}/>
+        {/* Forsa */}
       </Link>
 
       {/* Menu */}
