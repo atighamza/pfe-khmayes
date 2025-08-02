@@ -14,15 +14,19 @@ const studentPostSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
+      enum: ["pending", "rh", "technical", "accepted", "rejected"],
       default: "pending",
     },
     note: {
       type: String,
       default: "",
     },
+    resumeUrl: {
+      type: String,
+      required: true,
+    },
   },
-  { timestamps: true }
+  { timestamps: true, upsert: true, new: true }
 );
 
 module.exports = mongoose.model("StudentPost", studentPostSchema);

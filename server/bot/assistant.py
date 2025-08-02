@@ -1,12 +1,14 @@
-from openai import OpenAI
-from pymongo import MongoClient
-from .utils.pdf_parser import extract_text_from_pdf, chunk_text
-from langchain_community.vectorstores import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 import os
 import json
-from bson.objectid import ObjectId
 import logging
+import requests
+import tempfile
+from openai import OpenAI
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from .utils.pdf_parser import extract_text_from_pdf, chunk_text
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,7 @@ class ChatAssistant:
         )
         
     def _create_vector_store(self, texts, metadatas):
+        logger.info(f"Creating vector store with {len(texts)} texts")
         return Chroma.from_texts(
             texts=texts,
             embedding=self.embeddings,
@@ -34,22 +37,37 @@ class ChatAssistant:
         )
     
     def _get_cv_text(self, cv_path):
-        """Get CV text with proper error handling"""
+        """Get CV text with proper error handling for both local paths and URLs"""
         try:
-            # Make path absolute and handle both types of slashes
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            full_path = os.path.join(base_path, cv_path.lstrip('/').lstrip('\\'))
-            logger.info(f"Attempting to read CV from: {full_path}")
+            # Check if cv_path is a URL
+            if cv_path.startswith(('http://', 'https://')):
+                logger.info(f"Attempting to download CV from URL: {cv_path}")
+                response = requests.get(cv_path, timeout=10)
+                response.raise_for_status()
+                # Create temporary file for PDF
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+                    tmp.write(response.content)
+                    tmp_path = tmp.name
+                logger.info(f"Downloaded CV to temporary file: {tmp_path}")
+                text = extract_text_from_pdf(tmp_path)
+                os.unlink(tmp_path)  # Clean up temporary file
+            else:
+                # Handle local file path
+                base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                full_path = os.path.join(base_path, cv_path.lstrip('/').lstrip('\\'))
+                logger.info(f"Attempting to read CV from local path: {full_path}")
+                
+                if os.path.exists(full_path):
+                    logger.info("CV file found, extracting text...")
+                    text = extract_text_from_pdf(full_path)
+                else:
+                    logger.warning(f"CV file not found at path: {full_path}")
+                    return ""
             
-            if os.path.exists(full_path):
-                logger.info("CV file found, extracting text...")
-                text = extract_text_from_pdf(full_path)
-                logger.info(f"Extracted {len(text)} characters from CV")
-                return text
-            logger.warning(f"CV file not found at path: {full_path}")
-            return ""
+            logger.info(f"Extracted {len(text)} characters from CV")
+            return text
         except Exception as e:
-            logger.error(f"Error reading CV: {e}", exc_info=True)
+            logger.error(f"Error processing CV at {cv_path}: {e}", exc_info=True)
             return ""
     
     def _get_context(self, user_role, user_id):
@@ -75,13 +93,13 @@ class ChatAssistant:
         if user_role == "student":
             # Get student's data using PyMongo
             student = self.db.users.find_one({"_id": ObjectId(user_id)})
-            logger.info(f"Found student: {student.get('name')}")
+            logger.info(f"Found student: {student.get('name') if student else 'Not found'}")
             internships = list(self.db.internships.find())
             
-            # Extract text from CV with proper path handling
+            # Extract text from CV
             cv_text = ""
-            if student.get('resumeUrl'):
-                logger.info("Found resumeUrl, attempting to read CV")
+            if student and student.get('resumeUrl'):
+                logger.info(f"Found resumeUrl: {student['resumeUrl']}")
                 cv_text = self._get_cv_text(student['resumeUrl'])
                 logger.info(f"CV text extracted: {bool(cv_text)}")
             
@@ -96,6 +114,7 @@ class ChatAssistant:
                     "source": "cv",
                     "chunk_type": "cv_content"
                 } for _ in cv_chunks])
+                logger.info(f"Added {len(cv_chunks)} CV chunks to vector store")
             
             # Add profile data as additional context
             profile_text = f"""
@@ -126,15 +145,16 @@ class ChatAssistant:
                 "internship requirements and skills",
                 k=3
             )
+            logger.info(f"Found {len(relevant_chunks)} relevant chunks for student")
             
             context = {
                 "student_profile": {
-                    "name": student.get('name'),
-                    "university": student.get('university'),
-                    "degree": student.get('degree'),
-                    "year": student.get('year'),
+                    "name": student.get('name', ''),
+                    "university": student.get('university', ''),
+                    "degree": student.get('degree', ''),
+                    "year": student.get('year', '')
                 },
-                "cv_content": cv_text[:500] + "..." if cv_text else "",
+                "cv_content": cv_text[:500] + "..." if cv_text else "No CV uploaded",
                 "relevant_matches": [doc.page_content for doc in relevant_chunks],
                 "recent_conversation": recent_context
             }
@@ -142,16 +162,19 @@ class ChatAssistant:
         else:  # company
             logger.info("Processing company context")
             students = list(self.db.users.find({"role": "student"}))
+            logger.info(f"Found {len(students)} students")
             company_internships = list(
                 self.db.internships.find({"companyId": ObjectId(user_id)})
             )
+            logger.info(f"Found {len(company_internships)} company internships")
             
             texts = []
             metadatas = []
             
-            # Process all student CVs with proper path handling
+            # Process all student CVs
             for student in students:
                 if student.get('resumeUrl'):
+                    logger.info(f"Processing CV for student: {student.get('name')}")
                     cv_text = self._get_cv_text(student['resumeUrl'])
                     if cv_text:
                         cv_chunks = chunk_text(cv_text)
@@ -163,6 +186,9 @@ class ChatAssistant:
                             "student_degree": student.get('degree'),
                             "student_university": student.get('university')
                         } for _ in cv_chunks])
+                        logger.info(f"Added {len(cv_chunks)} CV chunks for student {student.get('name')}")
+                    else:
+                        logger.warning(f"No CV text extracted for student {student.get('name')}")
             
             for internship in company_internships:
                 texts.append(json.dumps({
@@ -178,6 +204,12 @@ class ChatAssistant:
                 "candidate skills and experience",
                 k=3
             )
+            logger.info(f"Found {len(relevant_chunks)} relevant chunks for company")
+            
+            # Count CV chunks for debugging
+            cv_chunk_count = sum(1 for meta in metadatas if meta.get('source') == 'cv')
+            relevant_cv_count = sum(1 for doc in relevant_chunks if doc.metadata.get('source') == 'cv')
+            logger.info(f"Total CV chunks: {cv_chunk_count}, Relevant CV chunks: {relevant_cv_count}")
             
             context = {
                 "company_internships": [
@@ -189,7 +221,9 @@ class ChatAssistant:
                 "relevant_candidates": [
                     {
                         "content": doc.page_content,
-                        "student_name": doc.metadata.get("student_name")
+                        "student_name": doc.metadata.get("student_name"),
+                        "student_degree": doc.metadata.get("student_degree"),
+                        "student_university": doc.metadata.get("student_university")
                     } for doc in relevant_chunks if doc.metadata.get("source") == "cv"
                 ],
                 "recent_conversation": recent_context
@@ -220,14 +254,15 @@ class ChatAssistant:
                 system_prompt = f"""You are an AI assistant helping with candidate matching.
                 Company Internships: {json.dumps(context_data.get('company_internships', []))}
                 Recent conversation: {context_data.get('recent_conversation', 'No previous context')}
-                Matching Candidates: {context_data.get('relevant_candidates', [])}
+                Matching Candidates: {json.dumps(context_data.get('relevant_candidates', []))}
                 
                 Focus on matching candidates to internship requirements.
-                Provide specific details about candidates' qualifications."""
-
+                Provide specific details about candidates' qualifications.
+                If no matching candidates are found, respond with 'No matching candidates found based on current data.'"""
+            
             logger.info("Sending request to LLM")
             completion = self.client.chat.completions.create(
-                model="qwen/qwen3-235b-a22b-07-25:free",
+                model="moonshotai/kimi-k2:free",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}

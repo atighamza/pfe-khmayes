@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
-import { fetchStudentPosts } from "../api/student";
+import {
+  fetchStudentPosts,
+  updateApplicationStatus,
+  deleteStudentApplication,
+} from "../api/student";
 import toast from "react-hot-toast";
+import StudentDetailsDialog from "../components/StudentDetailsDialog";
 
 export default function CompanyViewStudentPosts() {
   const [posts, setPosts] = useState([]);
@@ -8,6 +13,8 @@ export default function CompanyViewStudentPosts() {
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const limit = 6;
 
   const loadPosts = async () => {
@@ -23,11 +30,40 @@ export default function CompanyViewStudentPosts() {
   useEffect(() => {
     loadPosts();
   }, [page, search]);
+  const handleDeleteApplication = async (postId: string) => {
+    try {
+      await deleteStudentApplication(postId); // API call
+      toast.success("Application deleted");
+      setIsDialogOpen(false);
+      loadPosts();
+    } catch {
+      toast.error("Failed to delete application");
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
     setSearch(searchInput);
+  };
+
+  const handleCardClick = (post: any) => {
+    setSelectedPost(post);
+    setIsDialogOpen(true);
+  };
+
+  const handleStatusChange = async (
+    postId: string,
+    status: string,
+    post: any
+  ) => {
+    try {
+      await updateApplicationStatus(postId, status);
+      toast.success("Status updated and email sent");
+      loadPosts();
+    } catch (err) {
+      toast.error("Failed to update status");
+    }
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -59,7 +95,8 @@ export default function CompanyViewStudentPosts() {
           {posts.map((post: any) => (
             <div
               key={post._id}
-              className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition"
+              className="bg-white p-6 rounded-xl shadow hover:shadow-lg transition cursor-pointer"
+              onClick={() => handleCardClick(post)}
             >
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-xl font-semibold text-gray-800">
@@ -102,7 +139,6 @@ export default function CompanyViewStudentPosts() {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-6">
           {Array.from({ length: totalPages }, (_, i) => (
@@ -120,6 +156,14 @@ export default function CompanyViewStudentPosts() {
           ))}
         </div>
       )}
+
+      <StudentDetailsDialog
+        open={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        post={selectedPost}
+        onStatusChange={handleStatusChange}
+        onDelete={handleDeleteApplication}
+      />
     </div>
   );
 }

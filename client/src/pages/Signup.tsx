@@ -23,7 +23,7 @@ export default function Signup() {
       localStorage.setItem("token", res.data.token);
 
       toastSuccess("Account created! Welcome " + res.data.user.name);
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       toastError("Signup failed. Try again.");
     } finally {

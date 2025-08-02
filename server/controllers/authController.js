@@ -11,6 +11,10 @@ const generateToken = (user) => {
 exports.signup = async (req, res) => {
   const { name, email, password, role } = req.body;
   try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already in use" });
+    }
     const hash = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email, password: hash, role });
     res.status(201).json({ token: generateToken(user), user });

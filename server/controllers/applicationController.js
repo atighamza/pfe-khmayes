@@ -41,10 +41,11 @@ exports.applyForInternship = async (req, res) => {
         studentId: req.user._id,
         internshipId: req.params.id,
         status: "pending",
+        resumeUrl: req.user.resumeUrl,
       },
       { upsert: true, new: true }
     );
-
+    console.log("student post !!!", studentPost);
     res.status(201).json(studentPost);
   } catch (err) {
     console.error("Application error:", err);

@@ -26,3 +26,21 @@ export const updateStudentProfile = (formData: FormData) => {
     },
   });
 };
+export const updateApplicationStatus = (id, status) => {
+  const token = localStorage.getItem("token");
+  return axios.put(
+    `${API}/${id}/status`,
+    { status },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+};
+export const deleteStudentApplication = (id: string) => {
+  const token = localStorage.getItem("token");
+  return axios.delete(`http://localhost:5000/api/student/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+};

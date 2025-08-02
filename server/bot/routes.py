@@ -21,7 +21,8 @@ def get_user_from_token(token):
         # Decode token
         payload = jwt.decode(token, os.getenv('JWT_SECRET'), algorithms=['HS256'])
         return payload.get('id'), payload.get('role')
-    except:
+    except Exception as e:
+        logger.error(f"Error decoding token: {str(e)}", exc_info=True)
         return None, None
 
 @bot.route('/chat/history', methods=['GET'])
@@ -47,12 +48,14 @@ def get_chat_history():
                     "content": "$messages.content"
                 }}
             }}
-        ]).next()
+        ])
         
-        return jsonify({'history': chat_history.get('messages', [])})
+        # Handle case where no history exists
+        history = next(chat_history, None)
+        return jsonify({'history': history.get('messages', []) if history else []})
     except Exception as e:
         logger.error(f"Error fetching chat history: {str(e)}", exc_info=True)
-        return jsonify({'history': []})  # Return empty history instead of error
+        return jsonify({'history': []}), 500
 
 @bot.route('/chat', methods=['POST'])
 def chat():
