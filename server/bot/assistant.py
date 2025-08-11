@@ -94,7 +94,32 @@ class ChatAssistant:
             # Get student's data using PyMongo
             student = self.db.users.find_one({"_id": ObjectId(user_id)})
             logger.info(f"Found student: {student.get('name') if student else 'Not found'}")
-            internships = list(self.db.internships.find())
+            
+            # Get all internships with company information using aggregation
+            internships = list(self.db.internships.aggregate([
+                {
+                    "$lookup": {
+                        "from": "users",
+                        "localField": "companyId",
+                        "foreignField": "_id",
+                        "as": "company_info"
+                    }
+                },
+                {
+                    "$unwind": "$company_info"
+                },
+                {
+                    "$project": {
+                        "title": 1,
+                        "description": 1,
+                        "type": 1,
+                        "technologies": 1,
+                        "salary": 1,
+                        "duration": 1,
+                        "company": "$company_info.name"
+                    }
+                }
+            ]))
             
             # Extract text from CV
             cv_text = ""
@@ -130,22 +155,45 @@ class ChatAssistant:
                 "chunk_type": "student_info"
             })
             
+            # Format internships with complete information
             for internship in internships:
-                texts.append(json.dumps({
-                    "title": internship.get('title'),
-                    "description": internship.get('description'),
-                    "technologies": internship.get('technologies'),
-                    "type": internship.get('type')
-                }))
-                metadatas.append({"source": "internship"})
+                internship_text = f"""
+                Title: {internship.get('title', '')}
+                Company: {internship.get('company', '')}
+                Description: {internship.get('description', '')}
+                Type: {internship.get('type', '')}
+                Technologies: {', '.join(internship.get('technologies', []))}
+                Salary: {internship.get('salary', '')}
+                Duration: {internship.get('duration', '')}
+                """
+                texts.append(internship_text)
+                metadatas.append({
+                    "source": "internship",
+                    "company": internship.get('company', ''),
+                    "title": internship.get('title', ''),
+                    "type": internship.get('type', '')
+                })
             
             # Create vector store and get relevant chunks
             vectorstore = self._create_vector_store(texts, metadatas)
             relevant_chunks = vectorstore.similarity_search(
                 "internship requirements and skills",
-                k=3
+                k=5
             )
             logger.info(f"Found {len(relevant_chunks)} relevant chunks for student")
+            
+            # Format internships for context with complete details
+            all_internships = []
+            for internship in internships:
+                all_internships.append({
+                    "title": internship.get('title', ''),
+                    "company": internship.get('company', ''),
+                    "description": internship.get('description', ''),
+                    "type": internship.get('type', ''),
+                    "technologies": internship.get('technologies', []),
+                    "salary": internship.get('salary', ''),
+                    "duration": internship.get('duration', '')
+                })
             
             context = {
                 "student_profile": {
@@ -155,6 +203,7 @@ class ChatAssistant:
                     "year": student.get('year', '')
                 },
                 "cv_content": cv_text[:500] + "..." if cv_text else "No CV uploaded",
+                "all_internships": all_internships,
                 "relevant_matches": [doc.page_content for doc in relevant_chunks],
                 "recent_conversation": recent_context
             }
@@ -163,9 +212,33 @@ class ChatAssistant:
             logger.info("Processing company context")
             students = list(self.db.users.find({"role": "student"}))
             logger.info(f"Found {len(students)} students")
-            company_internships = list(
-                self.db.internships.find({"companyId": ObjectId(user_id)})
-            )
+            
+            # Get company internships with company information
+            company_internships = list(self.db.internships.aggregate([
+                {"$match": {"companyId": ObjectId(user_id)}},
+                {
+                    "$lookup": {
+                        "from": "users",
+                        "localField": "companyId",
+                        "foreignField": "_id",
+                        "as": "company_info"
+                    }
+                },
+                {
+                    "$unwind": "$company_info"
+                },
+                {
+                    "$project": {
+                        "title": 1,
+                        "description": 1,
+                        "type": 1,
+                        "technologies": 1,
+                        "salary": 1,
+                        "duration": 1,
+                        "company": "$company_info.name"
+                    }
+                }
+            ]))
             logger.info(f"Found {len(company_internships)} company internships")
             
             texts = []
@@ -190,14 +263,23 @@ class ChatAssistant:
                     else:
                         logger.warning(f"No CV text extracted for student {student.get('name')}")
             
+            # Format internships with complete information
             for internship in company_internships:
-                texts.append(json.dumps({
-                    "title": internship.get('title'),
-                    "description": internship.get('description'),
-                    "technologies": internship.get('technologies'),
-                    "type": internship.get('type')
-                }))
-                metadatas.append({"source": "internship"})
+                internship_text = f"""
+                Title: {internship.get('title', '')}
+                Company: {internship.get('company', '')}
+                Description: {internship.get('description', '')}
+                Type: {internship.get('type', '')}
+                Technologies: {', '.join(internship.get('technologies', []))}
+                Salary: {internship.get('salary', '')}
+                Duration: {internship.get('duration', '')}
+                """
+                texts.append(internship_text)
+                metadatas.append({
+                    "source": "internship",
+                    "company": internship.get('company', ''),
+                    "title": internship.get('title', '')
+                })
             
             vectorstore = self._create_vector_store(texts, metadatas)
             relevant_chunks = vectorstore.similarity_search(
@@ -211,13 +293,21 @@ class ChatAssistant:
             relevant_cv_count = sum(1 for doc in relevant_chunks if doc.metadata.get('source') == 'cv')
             logger.info(f"Total CV chunks: {cv_chunk_count}, Relevant CV chunks: {relevant_cv_count}")
             
+            # Format company internships with complete details
+            formatted_company_internships = []
+            for internship in company_internships:
+                formatted_company_internships.append({
+                    "title": internship.get('title', ''),
+                    "company": internship.get('company', ''),
+                    "description": internship.get('description', ''),
+                    "type": internship.get('type', ''),
+                    "technologies": internship.get('technologies', []),
+                    "salary": internship.get('salary', ''),
+                    "duration": internship.get('duration', '')
+                })
+            
             context = {
-                "company_internships": [
-                    {
-                        "title": i.get('title'),
-                        "technologies": i.get('technologies')
-                    } for i in company_internships
-                ],
+                "company_internships": formatted_company_internships,
                 "relevant_candidates": [
                     {
                         "content": doc.page_content,
@@ -241,17 +331,26 @@ class ChatAssistant:
             
             # Prepare system prompt based on role
             if user_role == "student":
-                system_prompt = f"""You are an AI assistant helping with internships.
+                system_prompt = f"""You are an AI assistant helping students find internships.
+                
                 Student Profile: {json.dumps(context_data.get('student_profile', {}))}
                 CV Content: {context_data.get('cv_content', 'No CV uploaded')}
                 Recent conversation: {context_data.get('recent_conversation', 'No previous context')}
-                Available Internships: {context_data.get('relevant_matches', [])}
                 
-                Respond with specific information from the internships database.
-                If asked about CV or profile, use only the student profile and CV content.
-                If asked about internships, list matching opportunities from the database."""
+                ALL AVAILABLE INTERNSHIPS: {json.dumps(context_data.get('all_internships', []))}
+                
+                When asked about "offers" or "internships", show ALL internships with complete details including:
+                - Title and Company
+                - Type (Summer/Final Year)
+                - Technologies required
+                - Salary and Duration
+                - Description
+                
+                When asked about a specific company (like "test company offers"), filter and show only that company's internships.
+                
+                Format your responses clearly with bullet points and complete information."""
             else:
-                system_prompt = f"""You are an AI assistant helping with candidate matching.
+                system_prompt = f"""You are an AI assistant helping companies find candidates.
                 Company Internships: {json.dumps(context_data.get('company_internships', []))}
                 Recent conversation: {context_data.get('recent_conversation', 'No previous context')}
                 Matching Candidates: {json.dumps(context_data.get('relevant_candidates', []))}
